@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── Install Qt6 ──
+      # ── Install Qt6 (cached by the action) ──
       - name: Install Qt6
         uses: jurplel/install-qt-action@v4
         with:
@@ -53,13 +53,35 @@ jobs:
           brew install cfitsio wcslib gsl
 
       # ── Windows dependencies ──
-      - name: Install Windows dependencies (vcpkg)
+      - name: Install Windows dependencies
         if: runner.os == 'Windows'
+        shell: bash
         run: |
-          vcpkg install cfitsio wcslib gsl --triplet x64-windows
+          vcpkg install cfitsio gsl --triplet x64-windows
 
-      # ── Build stellarsolver from source ──
+          # wcslib is not supported on Windows via vcpkg, build from source
+          curl -L https://www.atnf.csiro.au/people/mcalabre/WCS/wcslib-8.4.tar.bz2 -o wcslib.tar.bz2
+          tar xf wcslib.tar.bz2
+          cd wcslib-8.4
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            || true
+          cmake --build . --parallel --config Release || true
+          cmake --install . || true
+
+      # ── Cache stellarsolver build ──
+      - name: Cache stellarsolver
+        id: cache-stellarsolver
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/deps
+          key: stellarsolver-${{ runner.os }}-${{ runner.arch }}-v2
+
+      # ── Build stellarsolver only on cache miss ──
       - name: Build stellarsolver
+        if: steps.cache-stellarsolver.outputs.cache-hit != 'true'
         shell: bash
         run: |
           git clone --depth 1 https://github.com/rlancaste/stellarsolver.git /tmp/stellarsolver
@@ -69,7 +91,7 @@ jobs:
             cmake .. -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
               -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
-              -DCMAKE_PREFIX_PATH="$Qt6_DIR"
+              -DCMAKE_PREFIX_PATH="$Qt6_DIR;$GITHUB_WORKSPACE/deps"
           else
             cmake .. -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
@@ -82,7 +104,7 @@ jobs:
       - name: Configure
         shell: bash
         run: |
-          mkdir build && cd build
+          mkdir -p build && cd build
           CMAKE_EXTRA=""
           if [ "$RUNNER_OS" == "Windows" ]; then
             CMAKE_EXTRA="-DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
@@ -109,7 +131,6 @@ jobs:
         run: |
           mkdir -p pkg
           cp build/DitherAnalyser pkg/
-          # Bundle Qt frameworks
           $Qt6_DIR/../../bin/macdeployqt pkg/DitherAnalyser || true
           cp "$GITHUB_WORKSPACE"/deps/lib/libstellarsolver*.dylib pkg/ || true
           cd pkg
@@ -121,7 +142,6 @@ jobs:
         run: |
           mkdir -p pkg
           cp build/Release/DitherAnalyser.exe pkg/
-          # Bundle Qt DLLs
           "$Qt6_DIR/../../bin/windeployqt.exe" pkg/DitherAnalyser.exe || true
           cp "$GITHUB_WORKSPACE"/deps/bin/*.dll pkg/ || true
           cd pkg
