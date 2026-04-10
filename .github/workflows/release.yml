@@ -51,6 +51,8 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install cfitsio wcslib gsl
+          echo "PKG_CONFIG_PATH=$(brew --prefix cfitsio)/lib/pkgconfig:$(brew --prefix wcslib)/lib/pkgconfig:$(brew --prefix gsl)/lib/pkgconfig" >> $GITHUB_ENV
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix cfitsio);$(brew --prefix wcslib);$(brew --prefix gsl)" >> $GITHUB_ENV
 
       # ── Windows dependencies ──
       - name: Install Windows dependencies
@@ -58,18 +60,6 @@ jobs:
         shell: bash
         run: |
           vcpkg install cfitsio gsl --triplet x64-windows
-
-          # wcslib is not supported on Windows via vcpkg, build from source
-          curl -L https://www.atnf.csiro.au/people/mcalabre/WCS/wcslib-8.4.tar.bz2 -o wcslib.tar.bz2
-          tar xf wcslib.tar.bz2
-          cd wcslib-8.4
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
-            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
-            || true
-          cmake --build . --parallel --config Release || true
-          cmake --install . || true
 
       # ── Cache stellarsolver build ──
       - name: Cache stellarsolver
@@ -91,11 +81,18 @@ jobs:
             cmake .. -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
               -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
-              -DCMAKE_PREFIX_PATH="$Qt6_DIR;$GITHUB_WORKSPACE/deps"
+              -DCMAKE_PREFIX_PATH="$Qt6_DIR;$GITHUB_WORKSPACE/deps" \
+              -DBUILD_TESTER=OFF
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            cmake .. -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
+              -DCMAKE_PREFIX_PATH="$Qt6_DIR;$(brew --prefix cfitsio);$(brew --prefix wcslib);$(brew --prefix gsl)" \
+              -DBUILD_TESTER=OFF
           else
             cmake .. -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
-              -DCMAKE_PREFIX_PATH="$Qt6_DIR"
+              -DCMAKE_PREFIX_PATH="$Qt6_DIR" \
+              -DBUILD_TESTER=OFF
           fi
           cmake --build . --parallel
           cmake --install .
@@ -106,11 +103,14 @@ jobs:
         run: |
           mkdir -p build && cd build
           CMAKE_EXTRA=""
+          PREFIX_PATH="$Qt6_DIR;$GITHUB_WORKSPACE/deps"
           if [ "$RUNNER_OS" == "Windows" ]; then
             CMAKE_EXTRA="-DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            PREFIX_PATH="$PREFIX_PATH;$(brew --prefix cfitsio);$(brew --prefix wcslib);$(brew --prefix gsl)"
           fi
           cmake .. -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$Qt6_DIR;$GITHUB_WORKSPACE/deps" \
+            -DCMAKE_PREFIX_PATH="$PREFIX_PATH" \
             $CMAKE_EXTRA
 
       - name: Build
