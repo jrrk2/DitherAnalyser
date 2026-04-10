@@ -108,24 +108,70 @@ jobs:
         run: cmake --build build --parallel --config Release
 
       # ── Package ──
-      - name: Package (Linux)
+      - name: Package (Linux AppImage)
         if: runner.os == 'Linux'
         run: |
-          mkdir -p pkg
-          cp build/DitherAnalyser pkg/
-          cp "$GITHUB_WORKSPACE"/deps/lib/libstellarsolver*.so* pkg/ || true
-          cd pkg
-          tar czf ../${{ matrix.artifact }}.tar.gz *
+          # Get linuxdeploy
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+
+          # Create AppDir structure
+          mkdir -p AppDir/usr/bin AppDir/usr/lib AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
+          cp build/DitherAnalyser AppDir/usr/bin/
+          cp "$GITHUB_WORKSPACE"/deps/lib/libstellarsolver*.so* AppDir/usr/lib/ || true
+
+          # Desktop file
+          cat > AppDir/usr/share/applications/DitherAnalyser.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=DitherAnalyser
+          Exec=DitherAnalyser
+          Icon=DitherAnalyser
+          Categories=Science;Astronomy;
+          DESKTOP
+          sed -i 's/^          //' AppDir/usr/share/applications/DitherAnalyser.desktop
+
+          # Placeholder icon
+          convert -size 256x256 xc:'#1e1e2e' -fill '#89b4fa' -gravity center \
+            -pointsize 48 -annotate 0 'DA' \
+            AppDir/usr/share/icons/hicolor/256x256/apps/DitherAnalyser.png 2>/dev/null \
+            || touch AppDir/usr/share/icons/hicolor/256x256/apps/DitherAnalyser.png
+
+          export QMAKE=$Qt6_DIR/../../bin/qmake6
+          export LD_LIBRARY_PATH=$Qt6_DIR/../../lib:$GITHUB_WORKSPACE/deps/lib:$LD_LIBRARY_PATH
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
+          mv DitherAnalyser-*.AppImage ${{ matrix.artifact }}.AppImage
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
-          mkdir -p pkg
-          cp build/DitherAnalyser pkg/
-          $Qt6_DIR/../../bin/macdeployqt pkg/DitherAnalyser || true
-          cp "$GITHUB_WORKSPACE"/deps/lib/libstellarsolver*.dylib pkg/ || true
-          cd pkg
-          tar czf ../${{ matrix.artifact }}.tar.gz *
+          # Create .app bundle
+          mkdir -p DitherAnalyser.app/Contents/MacOS
+          mkdir -p DitherAnalyser.app/Contents/Resources
+          cp build/DitherAnalyser DitherAnalyser.app/Contents/MacOS/
+
+          cat > DitherAnalyser.app/Contents/Info.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key><string>DitherAnalyser</string>
+            <key>CFBundleIdentifier</key><string>com.github.jrrk2.DitherAnalyser</string>
+            <key>CFBundleName</key><string>DitherAnalyser</string>
+            <key>CFBundleVersion</key><string>1.0</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+
+          # Bundle Qt frameworks
+          $Qt6_DIR/../../bin/macdeployqt DitherAnalyser.app -verbose=2
+
+          # Create DMG
+          hdiutil create -volname DitherAnalyser -srcfolder DitherAnalyser.app \
+            -ov -format UDZO ${{ matrix.artifact }}.dmg
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -133,8 +179,11 @@ jobs:
         run: |
           mkdir -p pkg
           cp build/Release/DitherAnalyser.exe pkg/
-          "$Qt6_DIR/../../bin/windeployqt.exe" pkg/DitherAnalyser.exe || true
-          cp "$GITHUB_WORKSPACE"/deps/bin/*.dll pkg/ || true
+
+          # Bundle Qt DLLs
+          "$Qt6_DIR/../../bin/windeployqt.exe" --release --no-translations \
+            --no-system-d3d-compiler --no-opengl-sw pkg/DitherAnalyser.exe
+
           cd pkg
           7z a ../${{ matrix.artifact }}.zip *
 
@@ -143,7 +192,8 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.AppImage
+            ${{ matrix.artifact }}.dmg
             ${{ matrix.artifact }}.zip
 
   release:
@@ -161,5 +211,6 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            artifacts/**/*.tar.gz
+            artifacts/**/*.AppImage
+            artifacts/**/*.dmg
             artifacts/**/*.zip
