@@ -9,8 +9,19 @@ set(CMAKE_AUTORCC ON)
 option(ENABLE_STELLARSOLVER "Enable plate-solve verification and FWHM extraction via stellarsolver" OFF)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Charts Concurrent)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(CFITSIO REQUIRED cfitsio)
+
+# Find cfitsio — try pkg-config first, fall back to find_path/find_library
+find_package(PkgConfig QUIET)
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(CFITSIO cfitsio)
+endif()
+if(NOT CFITSIO_FOUND)
+    find_path(CFITSIO_INCLUDE_DIRS fitsio.h)
+    find_library(CFITSIO_LIBRARIES NAMES cfitsio)
+    if(NOT CFITSIO_INCLUDE_DIRS OR NOT CFITSIO_LIBRARIES)
+        message(FATAL_ERROR "cfitsio not found")
+    endif()
+endif()
 
 if(ENABLE_STELLARSOLVER)
     find_package(Qt6 REQUIRED COMPONENTS Network)
@@ -63,6 +74,9 @@ target_include_directories(DitherAnalyser PRIVATE
     ${CFITSIO_INCLUDE_DIRS}
     ${STELLARSOLVER_INCLUDE_DIRS}
 )
+if(CFITSIO_LIBRARY_DIRS)
+    target_link_directories(DitherAnalyser PRIVATE ${CFITSIO_LIBRARY_DIRS})
+endif()
 target_link_libraries(DitherAnalyser PRIVATE
     Qt6::Widgets
     Qt6::Charts
