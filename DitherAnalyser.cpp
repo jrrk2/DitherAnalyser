@@ -239,6 +239,7 @@ void FitsLoader::process()
     emit finished(frames);
 }
 
+#ifdef HAVE_STELLARSOLVER
 // ---------------------------------------------------------------------------
 // SolverVerifier – plate-solves frames to verify headers
 // ---------------------------------------------------------------------------
@@ -573,6 +574,7 @@ static double extractFwhm(const QString &filePath, double cdelt1, double cdelt2)
 
     return (pixscale > 0.001) ? medianFWHM * ds * pixscale : medianFWHM * ds;
 }
+#endif // HAVE_STELLARSOLVER
 
 // ---------------------------------------------------------------------------
 // DitherAnalyser – main window
@@ -591,19 +593,23 @@ DitherAnalyser::~DitherAnalyser()
         m_loaderThread->quit();
         m_loaderThread->wait();
     }
+#ifdef HAVE_STELLARSOLVER
     if (m_verifierThread) {
         if (m_verifier) m_verifier->abort();
         m_verifierThread->quit();
         m_verifierThread->wait();
     }
+#endif
     if (m_sharpWatcher) {
         m_sharpWatcher->cancel();
         m_sharpWatcher->waitForFinished();
     }
+#ifdef HAVE_STELLARSOLVER
     if (m_fwhmWatcher) {
         m_fwhmWatcher->cancel();
         m_fwhmWatcher->waitForFinished();
     }
+#endif
 }
 
 void DitherAnalyser::buildUI()
@@ -626,8 +632,10 @@ void DitherAnalyser::buildUI()
 
     connect(browseBtn, &QPushButton::clicked, this, &DitherAnalyser::browseDirectory);
 
-    // Verification controls
+    // Controls bar
     auto *verifyBar = new QHBoxLayout;
+
+#ifdef HAVE_STELLARSOLVER
     m_verifyBtn = new QPushButton("Verify RA/Dec (Plate Solve)");
     m_verifyBtn->setEnabled(false);
     m_verifyBtn->setToolTip("Plate-solve each frame using StellarSolver to verify header RA/Dec");
@@ -640,19 +648,22 @@ void DitherAnalyser::buildUI()
     m_radiusSpin->setDecimals(1);
     m_radiusSpin->setToolTip("Search radius around header RA/Dec hint");
 
-    m_binBtn = new QPushButton("Bin by Quality");
-    m_binBtn->setEnabled(false);
-    m_binBtn->setToolTip("Sort frames into quality subfolders (sharpness, FWHM, or combined)");
-
     verifyBar->addWidget(m_verifyBtn);
     verifyBar->addWidget(radiusLabel);
     verifyBar->addWidget(m_radiusSpin);
     verifyBar->addSpacing(20);
+
+    connect(m_verifyBtn, &QPushButton::clicked, this, &DitherAnalyser::startVerification);
+#endif
+
+    m_binBtn = new QPushButton("Bin by Quality");
+    m_binBtn->setEnabled(false);
+    m_binBtn->setToolTip("Sort frames into quality subfolders (sharpness, FWHM, or combined)");
+
     verifyBar->addWidget(m_binBtn);
     verifyBar->addStretch();
     mainLayout->addLayout(verifyBar);
 
-    connect(m_verifyBtn, &QPushButton::clicked, this, &DitherAnalyser::startVerification);
     connect(m_binBtn, &QPushButton::clicked, this, &DitherAnalyser::binByQuality);
 
     // Summary label
@@ -661,12 +672,14 @@ void DitherAnalyser::buildUI()
     m_summaryLabel->setStyleSheet("QLabel { background: #1e1e2e; color: #cdd6f4; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 11pt; }");
     mainLayout->addWidget(m_summaryLabel);
 
+#ifdef HAVE_STELLARSOLVER
     // Verification summary label
     m_verifySummaryLabel = new QLabel;
     m_verifySummaryLabel->setWordWrap(true);
     m_verifySummaryLabel->setStyleSheet("QLabel { background: #1e1e2e; color: #a6e3a1; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 11pt; }");
     m_verifySummaryLabel->setVisible(false);
     mainLayout->addWidget(m_verifySummaryLabel);
+#endif
 
     // Tabs for charts + table
     m_tabs = new QTabWidget;
@@ -701,11 +714,13 @@ void DitherAnalyser::buildUI()
     m_sharpView->setRenderHint(QPainter::Antialiasing);
     m_tabs->addTab(m_sharpView, "Sharpness");
 
+#ifdef HAVE_STELLARSOLVER
     // Star FWHM — deferred until tab is selected
     m_fwhmView = new QChartView;
     m_fwhmView->setRenderHint(QPainter::Antialiasing);
     m_tabs->addTab(m_fwhmView, "Star FWHM");
     m_envTabIndex = m_tabs->count() - 1;
+#endif
 
     // Table
     m_table = new QTableWidget;
@@ -728,9 +743,11 @@ void DitherAnalyser::browseDirectory()
     m_dirLabel->setText(dir);
     m_progress->setVisible(true);
     m_progress->setValue(0);
+#ifdef HAVE_STELLARSOLVER
     m_verifyBtn->setEnabled(false);
-    m_binBtn->setEnabled(false);
     m_verifySummaryLabel->setVisible(false);
+#endif
+    m_binBtn->setEnabled(false);
 
     // Clean up previous loader
     if (m_loaderThread) {
@@ -773,8 +790,10 @@ void DitherAnalyser::onFramesLoaded(std::vector<FrameInfo> frames)
         return;
     }
 
+#ifdef HAVE_STELLARSOLVER
     m_verifyBtn->setEnabled(true);
     m_fwhmDone = false;
+#endif
 
     analyse(m_frames);
     populateTable(m_frames);
@@ -790,6 +809,7 @@ void DitherAnalyser::onFramesLoaded(std::vector<FrameInfo> frames)
     startSharpnessExtraction();
 }
 
+#ifdef HAVE_STELLARSOLVER
 // ---------------------------------------------------------------------------
 // Verification
 // ---------------------------------------------------------------------------
@@ -905,6 +925,7 @@ void DitherAnalyser::onVerifyFinished()
     populateTable(m_frames);
     updateVerificationSummary();
 }
+#endif // HAVE_STELLARSOLVER
 
 void DitherAnalyser::startSharpnessExtraction()
 {
@@ -964,10 +985,15 @@ void DitherAnalyser::onSharpnessFinished()
 
 void DitherAnalyser::onTabChanged(int index)
 {
+#ifdef HAVE_STELLARSOLVER
     if (index == m_envTabIndex && !m_fwhmDone && !m_fwhmRunning && !m_frames.empty())
         startFwhmExtraction();
+#else
+    Q_UNUSED(index);
+#endif
 }
 
+#ifdef HAVE_STELLARSOLVER
 void DitherAnalyser::startFwhmExtraction()
 {
     if (m_frames.empty() || m_fwhmRunning) return;
@@ -1032,6 +1058,7 @@ void DitherAnalyser::onFwhmFinished()
     m_fwhmWatcher->deleteLater();
     m_fwhmWatcher = nullptr;
 }
+#endif // HAVE_STELLARSOLVER
 
 void DitherAnalyser::binByQuality()
 {
@@ -1218,6 +1245,7 @@ void DitherAnalyser::binByQuality()
             .arg(linked).arg(errors));
 }
 
+#ifdef HAVE_STELLARSOLVER
 void DitherAnalyser::updateVerificationSummary()
 {
     int solved = 0, failed = 0;
@@ -1280,6 +1308,7 @@ void DitherAnalyser::updateVerificationSummary()
     m_verifySummaryLabel->setText(html);
     m_verifySummaryLabel->setVisible(true);
 }
+#endif // HAVE_STELLARSOLVER
 
 // ---------------------------------------------------------------------------
 // Analysis
@@ -1319,18 +1348,20 @@ void DitherAnalyser::populateTable(const std::vector<FrameInfo> &frames)
 {
     m_table->clear();
 
+    QStringList headers = {"Frame", "Date-Obs", "RA (deg)", "Dec (deg)",
+                           "dRA (\")", "dDec (\")", "Dither Step (\")", "Exposure",
+                           "Temp (C)", "Focus", "FWHM (\")", "Sharpness"};
+
+#ifdef HAVE_STELLARSOLVER
     // Check if any frames have verification data
     bool hasVerification = false;
     for (const auto &f : frames) {
         if (f.verified) { hasVerification = true; break; }
     }
-
-    QStringList headers = {"Frame", "Date-Obs", "RA (deg)", "Dec (deg)",
-                           "dRA (\")", "dDec (\")", "Dither Step (\")", "Exposure",
-                           "Temp (C)", "Focus", "FWHM (\")", "Sharpness"};
     if (hasVerification) {
         headers << "Solved RA" << "Solved Dec" << "Error (\")" << "Status";
     }
+#endif
 
     m_table->setColumnCount(headers.size());
     m_table->setHorizontalHeaderLabels(headers);
@@ -1355,6 +1386,7 @@ void DitherAnalyser::populateTable(const std::vector<FrameInfo> &frames)
         m_table->setItem(i, 11, new QTableWidgetItem(
             std::isnan(f.sharpness) ? "--" : QString::number(f.sharpness, 'f', 4)));
 
+#ifdef HAVE_STELLARSOLVER
         if (hasVerification && f.verified) {
             if (f.solveSuccess) {
                 m_table->setItem(i, 12, new QTableWidgetItem(QString::number(f.solvedRA, 'f', 6)));
@@ -1382,6 +1414,7 @@ void DitherAnalyser::populateTable(const std::vector<FrameInfo> &frames)
                 m_table->setItem(i, 15, statusItem);
             }
         }
+#endif
     }
 
     m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
@@ -1744,6 +1777,7 @@ void DitherAnalyser::plotSharpness(const std::vector<FrameInfo> &frames)
     m_sharpView->setChart(chart);
 }
 
+#ifdef HAVE_STELLARSOLVER
 void DitherAnalyser::plotFwhm(const std::vector<FrameInfo> &frames)
 {
     auto *chart = new QChart;
@@ -1792,6 +1826,9 @@ void DitherAnalyser::plotFwhm(const std::vector<FrameInfo> &frames)
     delete m_fwhmView->chart();
     m_fwhmView->setChart(chart);
 }
+#else
+void DitherAnalyser::plotFwhm(const std::vector<FrameInfo> &) {}
+#endif
 
 void DitherAnalyser::updateSummary(const std::vector<FrameInfo> &frames)
 {

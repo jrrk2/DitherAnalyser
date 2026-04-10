@@ -18,8 +18,10 @@
 #include <atomic>
 
 #include <fitsio.h>
+#ifdef HAVE_STELLARSOLVER
 #include <stellarsolver.h>
 #include <parameters.h>
+#endif
 
 struct FrameInfo {
     std::string filename;
@@ -42,6 +44,7 @@ struct FrameInfo {
     double fwhm        = std::nan("");   // median star FWHM (arcsec)
     double sharpness   = std::nan("");   // HF power ratio (0-1, higher = sharper)
 
+#ifdef HAVE_STELLARSOLVER
     // Plate-solve verification results
     bool verified = false;
     bool solveSuccess = false;
@@ -51,6 +54,7 @@ struct FrameInfo {
     double raErrorArcsec = std::nan("");   // header vs solved difference
     double decErrorArcsec = std::nan("");
     double totalErrorArcsec = std::nan("");
+#endif
 };
 
 // Worker that loads FITS headers off the main thread
@@ -68,6 +72,7 @@ private:
     QString m_directory;
 };
 
+#ifdef HAVE_STELLARSOLVER
 // Worker that plate-solves frames to verify RA/DEC headers
 class SolverVerifier : public QObject {
     Q_OBJECT
@@ -97,6 +102,7 @@ private:
     double m_searchRadius;
     std::atomic<bool> m_abort{false};
 };
+#endif
 
 class DitherAnalyser : public QMainWindow {
     Q_OBJECT
@@ -108,16 +114,20 @@ private slots:
     void browseDirectory();
     void onFramesLoaded(std::vector<FrameInfo> frames);
     void onProgress(int current, int total);
+#ifdef HAVE_STELLARSOLVER
     void startVerification();
     void onVerifyProgress(int current, int total);
     void onFrameVerified(int index, bool success, double solvedRA, double solvedDec,
                          double pixscale, double raErr, double decErr, double totalErr);
     void onVerifyFinished();
+#endif
     void onTabChanged(int index);
     void startSharpnessExtraction();
     void onSharpnessFinished();
+#ifdef HAVE_STELLARSOLVER
     void startFwhmExtraction();
     void onFwhmFinished();
+#endif
     void binByQuality();
 
 private:
@@ -132,7 +142,9 @@ private:
     void plotSharpness(const std::vector<FrameInfo> &frames);
     void plotFwhm(const std::vector<FrameInfo> &frames);
     void updateSummary(const std::vector<FrameInfo> &frames);
+#ifdef HAVE_STELLARSOLVER
     void updateVerificationSummary();
+#endif
 
     // UI
     QLabel      *m_dirLabel;
@@ -148,10 +160,12 @@ private:
     QChartView  *m_fwhmView;
     QLabel      *m_summaryLabel;
 
+#ifdef HAVE_STELLARSOLVER
     // Verification UI
     QPushButton    *m_verifyBtn;
     QDoubleSpinBox *m_radiusSpin;
     QLabel         *m_verifySummaryLabel;
+#endif
 
     // Quality binning UI
     QPushButton    *m_binBtn;
@@ -159,16 +173,19 @@ private:
     QThread     *m_loaderThread = nullptr;
     FitsLoader  *m_loader = nullptr;
 
+#ifdef HAVE_STELLARSOLVER
     QThread        *m_verifierThread = nullptr;
     SolverVerifier *m_verifier = nullptr;
-
-    QFutureWatcher<void> *m_sharpWatcher = nullptr;
-    std::vector<double>  m_sharpResults;
 
     QFutureWatcher<void> *m_fwhmWatcher = nullptr;
     std::vector<double>  m_fwhmResults;
     bool            m_fwhmDone = false;
     bool            m_fwhmRunning = false;
+#endif
+
+    QFutureWatcher<void> *m_sharpWatcher = nullptr;
+    std::vector<double>  m_sharpResults;
+
     int             m_envTabIndex = -1;
 
     std::vector<FrameInfo> m_frames;

@@ -5,14 +5,17 @@
 #include <QDebug>
 
 #include <fitsio.h>
+#ifdef HAVE_STELLARSOLVER
 #include <stellarsolver.h>
 #include <parameters.h>
+#endif
 
 #include <cmath>
 #include <algorithm>
 #include <vector>
 #include <iostream>
 
+#ifdef HAVE_STELLARSOLVER
 // ---------------------------------------------------------------------------
 // CLI plate-solve verification (no GUI)
 // ---------------------------------------------------------------------------
@@ -344,6 +347,7 @@ static int runCLIVerify(const QString &directory, double searchRadius, bool sing
 
     return (failed > 0 && solved == 0) ? 1 : 0;
 }
+#endif // HAVE_STELLARSOLVER
 
 // ---------------------------------------------------------------------------
 // main
@@ -351,6 +355,7 @@ static int runCLIVerify(const QString &directory, double searchRadius, bool sing
 
 int main(int argc, char *argv[])
 {
+#ifdef HAVE_STELLARSOLVER
     // Quick check for --verify before creating QApplication
     bool wantCLI = false;
     for (int i = 1; i < argc; ++i) {
@@ -391,6 +396,7 @@ int main(int argc, char *argv[])
 
         return runCLIVerify(path, radius, singleFile);
     }
+#endif // HAVE_STELLARSOLVER
 
     // GUI mode
     QApplication app(argc, argv);

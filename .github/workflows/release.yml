@@ -18,12 +18,15 @@ jobs:
           - os: ubuntu-22.04
             name: Linux
             artifact: DitherAnalyser-linux-x86_64
+            stellarsolver: ON
           - os: macos-14
             name: macOS
             artifact: DitherAnalyser-macos-arm64
+            stellarsolver: OFF
           - os: windows-latest
             name: Windows
             artifact: DitherAnalyser-windows-x86_64
+            stellarsolver: OFF
 
     runs-on: ${{ matrix.os }}
     name: Build (${{ matrix.name }})
@@ -50,18 +53,19 @@ jobs:
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install cfitsio wcslib gsl
-          echo "PKG_CONFIG_PATH=$(brew --prefix cfitsio)/lib/pkgconfig:$(brew --prefix wcslib)/lib/pkgconfig:$(brew --prefix gsl)/lib/pkgconfig" >> $GITHUB_ENV
+          brew install cfitsio
+          echo "PKG_CONFIG_PATH=$(brew --prefix cfitsio)/lib/pkgconfig" >> $GITHUB_ENV
 
       # ── Windows dependencies ──
       - name: Install Windows dependencies
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          vcpkg install cfitsio gsl --triplet x64-windows
+          vcpkg install cfitsio --triplet x64-windows
 
       # ── Cache stellarsolver build ──
       - name: Cache stellarsolver
+        if: matrix.stellarsolver == 'ON'
         id: cache-stellarsolver
         uses: actions/cache@v4
         with:
@@ -70,29 +74,16 @@ jobs:
 
       # ── Build stellarsolver only on cache miss ──
       - name: Build stellarsolver
-        if: steps.cache-stellarsolver.outputs.cache-hit != 'true'
+        if: matrix.stellarsolver == 'ON' && steps.cache-stellarsolver.outputs.cache-hit != 'true'
         shell: bash
         run: |
           git clone --depth 1 https://github.com/rlancaste/stellarsolver.git /tmp/stellarsolver
           cd /tmp/stellarsolver
           mkdir build && cd build
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            cmake .. -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
-              -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
-              -DCMAKE_PREFIX_PATH="$Qt6_DIR;$GITHUB_WORKSPACE/deps" \
-              -DBUILD_TESTER=OFF
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            cmake .. -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
-              -DCMAKE_PREFIX_PATH="$Qt6_DIR;$(brew --prefix cfitsio);$(brew --prefix wcslib);$(brew --prefix gsl)" \
-              -DBUILD_TESTER=OFF
-          else
-            cmake .. -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
-              -DCMAKE_PREFIX_PATH="$Qt6_DIR" \
-              -DBUILD_TESTER=OFF
-          fi
+          cmake .. -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps" \
+            -DCMAKE_PREFIX_PATH="$Qt6_DIR" \
+            -DBUILD_TESTER=OFF
           cmake --build . --parallel
           cmake --install .
 
@@ -106,10 +97,11 @@ jobs:
           if [ "$RUNNER_OS" == "Windows" ]; then
             CMAKE_EXTRA="-DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            PREFIX_PATH="$PREFIX_PATH;$(brew --prefix cfitsio);$(brew --prefix wcslib);$(brew --prefix gsl)"
+            PREFIX_PATH="$PREFIX_PATH;$(brew --prefix cfitsio)"
           fi
           cmake .. -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$PREFIX_PATH" \
+            -DENABLE_STELLARSOLVER=${{ matrix.stellarsolver }} \
             $CMAKE_EXTRA
 
       - name: Build
