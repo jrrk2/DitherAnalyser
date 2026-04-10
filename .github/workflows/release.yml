@@ -138,8 +138,8 @@ jobs:
             AppDir/usr/share/icons/hicolor/256x256/apps/DitherAnalyser.png 2>/dev/null \
             || touch AppDir/usr/share/icons/hicolor/256x256/apps/DitherAnalyser.png
 
-          export QMAKE=$Qt6_DIR/../../bin/qmake6
-          export LD_LIBRARY_PATH=$Qt6_DIR/../../lib:$GITHUB_WORKSPACE/deps/lib:$LD_LIBRARY_PATH
+          export QMAKE=$QT_ROOT_DIR/bin/qmake6
+          export LD_LIBRARY_PATH=$QT_ROOT_DIR/lib:$GITHUB_WORKSPACE/deps/lib:$LD_LIBRARY_PATH
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
           mv DitherAnalyser-*.AppImage ${{ matrix.artifact }}.AppImage
 
@@ -167,7 +167,7 @@ jobs:
           PLIST
 
           # Bundle Qt frameworks
-          $Qt6_DIR/../../bin/macdeployqt DitherAnalyser.app -verbose=2
+          $QT_ROOT_DIR/bin/macdeployqt DitherAnalyser.app -verbose=2
 
           # Create DMG
           hdiutil create -volname DitherAnalyser -srcfolder DitherAnalyser.app \
@@ -181,7 +181,7 @@ jobs:
           cp build/Release/DitherAnalyser.exe pkg/
 
           # Bundle Qt DLLs
-          "$Qt6_DIR/../../bin/windeployqt.exe" --release --no-translations \
+          "$QT_ROOT_DIR/bin/windeployqt.exe" --release --no-translations \
             --no-system-d3d-compiler --no-opengl-sw pkg/DitherAnalyser.exe
 
           cd pkg
