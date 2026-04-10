@@ -169,6 +169,25 @@ jobs:
           # Bundle Qt frameworks
           $QT_ROOT_DIR/bin/macdeployqt DitherAnalyser.app -verbose=2
 
+          # Fix Qt framework structure for codesign (macdeployqt leaves them incomplete)
+          for fw in DitherAnalyser.app/Contents/Frameworks/Qt*.framework; do
+            name=$(basename "$fw" .framework)
+            # Ensure Versions/Current symlink exists
+            if [ ! -L "$fw/Versions/Current" ]; then
+              ln -sf A "$fw/Versions/Current"
+            fi
+            # Ensure top-level symlinks exist
+            if [ ! -L "$fw/$name" ]; then
+              ln -sf Versions/Current/$name "$fw/$name"
+            fi
+            if [ -d "$fw/Versions/A/Resources" ] && [ ! -L "$fw/Resources" ]; then
+              ln -sf Versions/Current/Resources "$fw/Resources"
+            fi
+          done
+
+          # Ad-hoc sign
+          codesign --force --deep --sign - DitherAnalyser.app
+
           # Create DMG
           hdiutil create -volname DitherAnalyser -srcfolder DitherAnalyser.app \
             -ov -format UDZO ${{ matrix.artifact }}.dmg
@@ -183,6 +202,9 @@ jobs:
           # Bundle Qt DLLs
           "$QT_ROOT_DIR/bin/windeployqt.exe" --release --no-translations \
             --no-system-d3d-compiler --no-opengl-sw pkg/DitherAnalyser.exe
+
+          # Bundle vcpkg dependencies (cfitsio etc.)
+          cp "$VCPKG_INSTALLATION_ROOT"/installed/x64-windows/bin/*.dll pkg/ || true
 
           cd pkg
           7z a ../${{ matrix.artifact }}.zip *
