@@ -52,7 +52,6 @@ jobs:
         run: |
           brew install cfitsio wcslib gsl
           echo "PKG_CONFIG_PATH=$(brew --prefix cfitsio)/lib/pkgconfig:$(brew --prefix wcslib)/lib/pkgconfig:$(brew --prefix gsl)/lib/pkgconfig" >> $GITHUB_ENV
-          echo "CMAKE_PREFIX_PATH=$(brew --prefix cfitsio);$(brew --prefix wcslib);$(brew --prefix gsl)" >> $GITHUB_ENV
 
       # ── Windows dependencies ──
       - name: Install Windows dependencies
