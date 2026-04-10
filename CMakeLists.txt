@@ -10,9 +10,27 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Charts Concurrent)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(CFITSIO REQUIRED cfitsio)
 
-# Use the system Qt6 build of stellarsolver (not the Qt5 one in /usr/local)
-set(STELLARSOLVER_INCLUDE_DIRS /usr/include/libstellarsolver)
-set(STELLARSOLVER_LIBRARIES /usr/lib/x86_64-linux-gnu/libstellarsolver6.so)
+# Find stellarsolver — try cmake config first, fall back to system paths
+find_package(stellarsolver QUIET)
+if(NOT stellarsolver_FOUND)
+    # Fallback for system installs without cmake config
+    find_path(STELLARSOLVER_INCLUDE_DIR stellarsolver.h
+        PATHS /usr/include/libstellarsolver /usr/local/include/libstellarsolver
+    )
+    find_library(STELLARSOLVER_LIBRARY
+        NAMES stellarsolver6 stellarsolver
+        PATHS /usr/lib/x86_64-linux-gnu /usr/local/lib
+    )
+    if(STELLARSOLVER_INCLUDE_DIR AND STELLARSOLVER_LIBRARY)
+        set(STELLARSOLVER_INCLUDE_DIRS ${STELLARSOLVER_INCLUDE_DIR})
+        set(STELLARSOLVER_LIBRARIES ${STELLARSOLVER_LIBRARY})
+    else()
+        message(FATAL_ERROR "stellarsolver not found")
+    endif()
+else()
+    set(STELLARSOLVER_INCLUDE_DIRS "")
+    set(STELLARSOLVER_LIBRARIES stellarsolver::stellarsolver)
+endif()
 
 add_executable(DitherAnalyser
     main.cpp
