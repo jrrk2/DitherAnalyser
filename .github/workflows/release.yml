@@ -206,6 +206,17 @@ jobs:
           # Bundle vcpkg dependencies (cfitsio etc.)
           cp "$VCPKG_INSTALLATION_ROOT"/installed/x64-windows/bin/*.dll pkg/ || true
 
+          # Bundle MSVC runtime DLLs
+          MSVC_REDIST="$(vswhere -latest -find 'VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT')"
+          if [ -d "$MSVC_REDIST" ]; then
+            cp "$MSVC_REDIST"/*.dll pkg/
+          else
+            # Fallback: copy from system
+            for dll in msvcp140.dll msvcp140_1.dll vcruntime140.dll vcruntime140_1.dll; do
+              find "C:/Windows" -name "$dll" 2>/dev/null | head -1 | xargs -I{} cp "{}" pkg/ || true
+            done
+          fi
+
           cd pkg
           7z a ../${{ matrix.artifact }}.zip *
 
