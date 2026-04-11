@@ -795,18 +795,29 @@ void DitherAnalyser::onFramesLoaded(std::vector<FrameInfo> frames)
     m_fwhmDone = false;
 #endif
 
+    qDebug() << "onFramesLoaded: analysing" << m_frames.size() << "frames";
     analyse(m_frames);
+    qDebug() << "onFramesLoaded: populateTable";
     populateTable(m_frames);
+    qDebug() << "onFramesLoaded: plotDitherScatter";
     plotDitherScatter(m_frames);
+    qDebug() << "onFramesLoaded: plotDitherTimeline";
     plotDitherTimeline(m_frames);
+    qDebug() << "onFramesLoaded: plotDitherRose";
     plotDitherRose(m_frames);
+    qDebug() << "onFramesLoaded: plotFieldRotation";
     plotFieldRotation(m_frames);
+    qDebug() << "onFramesLoaded: plotEnvironment";
     plotEnvironment(m_frames);
+    qDebug() << "onFramesLoaded: plotSharpness";
     plotSharpness(m_frames);
+    qDebug() << "onFramesLoaded: updateSummary";
     updateSummary(m_frames);
+    qDebug() << "onFramesLoaded: startSharpnessExtraction";
 
     // Kick off parallel sharpness extraction
     startSharpnessExtraction();
+    qDebug() << "onFramesLoaded: done";
 }
 
 #ifdef HAVE_STELLARSOLVER

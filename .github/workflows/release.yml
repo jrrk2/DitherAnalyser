@@ -39,7 +39,16 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.7.*'
+          arch: ${{ runner.os == 'Windows' && 'win64_mingw' || '' }}
           modules: 'qtcharts'
+          cache: true
+
+      - name: Install MinGW (Windows)
+        if: runner.os == 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.*'
+          tools: 'tools_mingw1310'
           cache: true
 
       # ── Linux dependencies ──
@@ -56,12 +65,19 @@ jobs:
           brew install cfitsio
           echo "PKG_CONFIG_PATH=$(brew --prefix cfitsio)/lib/pkgconfig" >> $GITHUB_ENV
 
-      # ── Windows dependencies ──
+      # ── Windows dependencies (build cfitsio with MinGW) ──
       - name: Install Windows dependencies
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          vcpkg install cfitsio --triplet x64-windows
+          curl -sL https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.4.1.tar.gz | tar xz
+          cd cfitsio-4.4.1
+          mkdir build && cd build
+          cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/deps/cfitsio" \
+            -DBUILD_SHARED_LIBS=ON
+          cmake --build . --parallel
+          cmake --install .
 
       # ── Cache stellarsolver build ──
       - name: Cache stellarsolver
@@ -95,7 +111,8 @@ jobs:
           CMAKE_EXTRA=""
           PREFIX_PATH="$Qt6_DIR;$GITHUB_WORKSPACE/deps"
           if [ "$RUNNER_OS" == "Windows" ]; then
-            CMAKE_EXTRA="-DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+            PREFIX_PATH="$Qt6_DIR;$GITHUB_WORKSPACE/deps/cfitsio"
+            CMAKE_EXTRA="-G Ninja"
           elif [ "$RUNNER_OS" == "macOS" ]; then
             PREFIX_PATH="$PREFIX_PATH;$(brew --prefix cfitsio)"
           fi
@@ -197,14 +214,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p pkg
-          cp build/Release/DitherAnalyser.exe pkg/
+          cp build/DitherAnalyser.exe pkg/
 
           # Bundle Qt DLLs
           "$QT_ROOT_DIR/bin/windeployqt.exe" --release --no-translations \
             --no-system-d3d-compiler --no-opengl-sw pkg/DitherAnalyser.exe
 
-          # Bundle vcpkg dependencies (cfitsio etc.)
-          cp "$VCPKG_INSTALLATION_ROOT"/installed/x64-windows/bin/*.dll pkg/ || true
+          # Bundle cfitsio and its dependencies
+          cp "$GITHUB_WORKSPACE"/deps/cfitsio/bin/*.dll pkg/ || true
 
           # Bundle MSVC runtime DLLs
           MSVC_REDIST="$(vswhere -latest -find 'VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT')"

@@ -10,13 +10,20 @@ option(ENABLE_STELLARSOLVER "Enable plate-solve verification and FWHM extraction
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Charts Concurrent)
 
-# Find cfitsio — try pkg-config first, fall back to find_path/find_library
-find_package(PkgConfig QUIET)
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(CFITSIO cfitsio)
+# Find cfitsio — try vcpkg config first, then pkg-config, then manual search
+find_package(unofficial-cfitsio CONFIG QUIET)
+if(TARGET cfitsio)
+    set(CFITSIO_TARGET cfitsio)
+    set(CFITSIO_FOUND TRUE)
 endif()
 if(NOT CFITSIO_FOUND)
-    find_path(CFITSIO_INCLUDE_DIRS fitsio.h)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(CFITSIO cfitsio)
+    endif()
+endif()
+if(NOT CFITSIO_FOUND)
+    find_path(CFITSIO_INCLUDE_DIRS fitsio.h PATH_SUFFIXES cfitsio)
     find_library(CFITSIO_LIBRARIES NAMES cfitsio)
     if(NOT CFITSIO_INCLUDE_DIRS OR NOT CFITSIO_LIBRARIES)
         message(FATAL_ERROR "cfitsio not found")
@@ -70,17 +77,35 @@ if(ENABLE_STELLARSOLVER)
     target_compile_definitions(DitherAnalyser PRIVATE HAVE_STELLARSOLVER)
 endif()
 
-target_include_directories(DitherAnalyser PRIVATE
-    ${CFITSIO_INCLUDE_DIRS}
-    ${STELLARSOLVER_INCLUDE_DIRS}
-)
-if(CFITSIO_LIBRARY_DIRS)
-    target_link_directories(DitherAnalyser PRIVATE ${CFITSIO_LIBRARY_DIRS})
+if(NOT CFITSIO_TARGET)
+    target_include_directories(DitherAnalyser PRIVATE ${CFITSIO_INCLUDE_DIRS})
+    if(CFITSIO_LIBRARY_DIRS)
+        target_link_directories(DitherAnalyser PRIVATE ${CFITSIO_LIBRARY_DIRS})
+    endif()
+endif()
+if(STELLARSOLVER_INCLUDE_DIRS)
+    target_include_directories(DitherAnalyser PRIVATE ${STELLARSOLVER_INCLUDE_DIRS})
+endif()
+if(CFITSIO_TARGET)
+    set(_CFITSIO_LINK ${CFITSIO_TARGET})
+else()
+    set(_CFITSIO_LINK ${CFITSIO_LIBRARIES})
 endif()
 target_link_libraries(DitherAnalyser PRIVATE
     Qt6::Widgets
     Qt6::Charts
     Qt6::Concurrent
-    ${CFITSIO_LIBRARIES}
+    ${_CFITSIO_LINK}
     ${STELLARSOLVER_TARGET}
 )
+
+# Auto-deploy Qt DLLs next to the executable on Windows
+if(WIN32)
+    find_program(WINDEPLOYQT windeployqt HINTS "${Qt6_DIR}/../../../bin")
+    if(WINDEPLOYQT)
+        add_custom_command(TARGET DitherAnalyser POST_BUILD
+            COMMAND "${WINDEPLOYQT}" "$<TARGET_FILE:DitherAnalyser>"
+            COMMENT "Running windeployqt..."
+        )
+    endif()
+endif()

@@ -400,7 +400,10 @@ int main(int argc, char *argv[])
 
     // GUI mode
     QApplication app(argc, argv);
-    app.setStyle("Fusion");
+
+    // Use Fusion if available (Qt <6.11), otherwise fall back to default
+    if (auto *style = QApplication::setStyle("Fusion"); !style)
+        QApplication::setStyle("modernwindows");
 
     // Dark palette
     QPalette darkPalette;
