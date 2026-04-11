@@ -1480,8 +1480,13 @@ void DitherAnalyser::plotDitherScatter(const std::vector<FrameInfo> &frames)
         }
     }
 
-    delete m_scatterView->chart();
+    auto *oldChart = m_scatterView->chart();
+
+
     m_scatterView->setChart(chart);
+
+
+    delete oldChart;
 }
 
 void DitherAnalyser::plotDitherTimeline(const std::vector<FrameInfo> &frames)
@@ -1521,8 +1526,13 @@ void DitherAnalyser::plotDitherTimeline(const std::vector<FrameInfo> &frames)
         if (yAxis) yAxis->setTitleText("Arcseconds");
     }
 
-    delete m_timelineView->chart();
+    auto *oldChart = m_timelineView->chart();
+
+
     m_timelineView->setChart(chart);
+
+
+    delete oldChart;
 }
 
 void DitherAnalyser::plotDitherRose(const std::vector<FrameInfo> &frames)
@@ -1574,8 +1584,13 @@ void DitherAnalyser::plotDitherRose(const std::vector<FrameInfo> &frames)
     chart->addAxis(axisY, Qt::AlignLeft);
     series->attachAxis(axisY);
 
-    delete m_roseView->chart();
+    auto *oldChart = m_roseView->chart();
+
+
     m_roseView->setChart(chart);
+
+
+    delete oldChart;
 }
 
 void DitherAnalyser::plotFieldRotation(const std::vector<FrameInfo> &frames)
@@ -1585,16 +1600,22 @@ void DitherAnalyser::plotFieldRotation(const std::vector<FrameInfo> &frames)
     chart->setTheme(QChart::ChartThemeDark);
 
     if (frames.size() < 2 || frames.front().dateObs.empty()) {
-        delete m_rotationView->chart();
+        auto *oldChart = m_rotationView->chart();
+
         m_rotationView->setChart(chart);
+
+        delete oldChart;
         return;
     }
 
     QDateTime t0 = QDateTime::fromString(
         QString::fromStdString(frames.front().dateObs), Qt::ISODate);
     if (!t0.isValid()) {
-        delete m_rotationView->chart();
+        auto *oldChart = m_rotationView->chart();
+
         m_rotationView->setChart(chart);
+
+        delete oldChart;
         return;
     }
 
@@ -1655,8 +1676,13 @@ void DitherAnalyser::plotFieldRotation(const std::vector<FrameInfo> &frames)
         if (yAxis) yAxis->setTitleText("Degrees");
     }
 
-    delete m_rotationView->chart();
+    auto *oldChart = m_rotationView->chart();
+
+
     m_rotationView->setChart(chart);
+
+
+    delete oldChart;
 }
 
 void DitherAnalyser::plotEnvironment(const std::vector<FrameInfo> &frames)
@@ -1666,8 +1692,11 @@ void DitherAnalyser::plotEnvironment(const std::vector<FrameInfo> &frames)
     chart->setTheme(QChart::ChartThemeDark);
 
     if (frames.empty()) {
-        delete m_envView->chart();
+        auto *oldChart = m_envView->chart();
+
         m_envView->setChart(chart);
+
+        delete oldChart;
         return;
     }
 
@@ -1679,8 +1708,11 @@ void DitherAnalyser::plotEnvironment(const std::vector<FrameInfo> &frames)
 
     if (!hasTemp && !hasFocus) {
         chart->setTitle("Temperature & Focus (no data in headers)");
-        delete m_envView->chart();
+        auto *oldChart = m_envView->chart();
+
         m_envView->setChart(chart);
+
+        delete oldChart;
         return;
     }
 
@@ -1724,8 +1756,13 @@ void DitherAnalyser::plotEnvironment(const std::vector<FrameInfo> &frames)
     if (!hasTemp)
         axisYLeft->setVisible(false);
 
-    delete m_envView->chart();
+    auto *oldChart = m_envView->chart();
+
+
     m_envView->setChart(chart);
+
+
+    delete oldChart;
 }
 
 void DitherAnalyser::plotSharpness(const std::vector<FrameInfo> &frames)
@@ -1740,8 +1777,11 @@ void DitherAnalyser::plotSharpness(const std::vector<FrameInfo> &frames)
 
     if (!hasData) {
         chart->setTitle("Sharpness (no data)");
-        delete m_sharpView->chart();
+        auto *oldChart = m_sharpView->chart();
+
         m_sharpView->setChart(chart);
+
+        delete oldChart;
         return;
     }
 
@@ -1773,8 +1813,13 @@ void DitherAnalyser::plotSharpness(const std::vector<FrameInfo> &frames)
         if (yAxis) yAxis->setTitleText("HF Power Ratio (higher = sharper)");
     }
 
-    delete m_sharpView->chart();
+    auto *oldChart = m_sharpView->chart();
+
+
     m_sharpView->setChart(chart);
+
+
+    delete oldChart;
 }
 
 #ifdef HAVE_STELLARSOLVER
@@ -1790,8 +1835,11 @@ void DitherAnalyser::plotFwhm(const std::vector<FrameInfo> &frames)
 
     if (!hasFwhm) {
         chart->setTitle("Star FWHM (no data yet)");
-        delete m_fwhmView->chart();
+        auto *oldChart = m_fwhmView->chart();
+
         m_fwhmView->setChart(chart);
+
+        delete oldChart;
         return;
     }
 
@@ -1823,8 +1871,13 @@ void DitherAnalyser::plotFwhm(const std::vector<FrameInfo> &frames)
         if (yAxis) yAxis->setTitleText("FWHM (arcsec)");
     }
 
-    delete m_fwhmView->chart();
+    auto *oldChart = m_fwhmView->chart();
+
+
     m_fwhmView->setChart(chart);
+
+
+    delete oldChart;
 }
 #else
 void DitherAnalyser::plotFwhm(const std::vector<FrameInfo> &) {}
